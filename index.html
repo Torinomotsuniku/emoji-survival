@@ -181,56 +181,7 @@
         overlay.style.display = 'flex';
         lastRecord.innerText = `生存時間: ${formatTime(elapsedTime)}`;
     }
-    // 1. プレイヤーの初期ステータスに追加
-const player = {
-    x: canvas.width / 2,
-    y: canvas.height / 2,
-    isStunned: false,
-    stunTimer: 0,
-    // ...他のプロパティ
-};
-
-// 2. 更新処理（メインループ内）
-function update() {
-    if (player.isStunned) {
-        player.stunTimer--;
-        if (player.stunTimer <= 0) {
-            player.isStunned = false;
-        }
-    }
-
-    // スタン中でなければ移動可能
-    if (!player.isStunned) {
-        handlePlayerMovement(); 
-    }
-
-    // 敵や「不安」との衝突判定
-    checkCollisions();
-}
-
-// 3. 衝突判定のロジック
-function checkCollisions() {
-    obstacles.forEach((obs) => {
-        if (isColliding(player, obs) && obs.type === '😰') { // 「不安」の絵文字
-            player.isStunned = true;
-            player.stunTimer = 30; // 0.5秒 (60fpsの場合)
-            
-            // 少し弾き飛ばされる演出を入れるとより分かりやすい
-            applyKnockback(player); 
-        }
-    });
-}
-    // 描画部分
-function drawPlayer() {
-    ctx.save();
-    if (player.isStunned) {
-        // スタン中は少し透明にする、または震わせる
-        ctx.globalAlpha = 0.5;
-        ctx.translate(Math.random() * 4 - 2, Math.random() * 4 - 2);
-    }
-    ctx.fillText(player.emoji, player.x, player.y);
-    ctx.restore();
-}
+ 
 </script>
 </body>
 </html>
