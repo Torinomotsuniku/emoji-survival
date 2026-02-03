@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emoji Survival - 感情サバイバル</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: radial-gradient(circle, #1a1a2e 0%, #0f0f1b 100%); color: #fff; font-family: 'Helvetica Neue', Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        canvas { border: 2px solid #4e4e6d; box-shadow: 0 0 25px rgba(0, 242, 255, 0.3); background: #000; cursor: none; }
+        #ui { position: absolute; top: 20px; left: 20px; pointer-events: none; width: 300px; }
+        .timer { font-size: 32px; font-weight: bold; font-variant-numeric: tabular-nums; text-shadow: 0 0 15px #00f2ff; color: #00f2ff; margin-bottom: 10px; }
+        
+        /* 必殺技ゲージのスタイル */
+        .gauge-container { width: 100%; height: 12px; background: rgba(255,255,255,0.1); border-radius: 10px; border: 1px solid rgba(255,255,255,0.3); overflow: hidden; }
+        #gaugeBar { width: 0%; height: 100%; background: linear-gradient(90deg, #ff007b, #00f2ff); box-shadow: 0 0 10px #00f2ff; transition: width 0.1s linear; }
+        .gauge-text { font-size: 12px; margin-top: 5px; color: #aaa; text-transform: uppercase; letter-spacing: 1px; }
+        .ready { color: #00f2ff; font-weight: bold; text-shadow: 0 0 10px #00f2ff; animation: blink 0.5s infinite alternate; }
+        
+        @keyframes blink { from { opacity: 0.5; } to { opacity: 1; } }
+
+        #overlay { position: absolute; display: flex; flex-direction: column; align-items: center; background: rgba(0, 0, 0, 0.85); padding: 40px; border-radius: 20px; text-align: center; backdrop-filter: blur(5px); }
+        button { padding: 12px 30px; font-size: 18px; background: #00f2ff; border: none; border-radius: 50px; cursor: pointer; font-weight: bold; transition: 0.3s; margin-top: 20px; }
+        button:hover { background: #ff007b; color: white; transform: scale(1.1); }
+    </style>
+</head>
+<body>
+
+    <div id="ui">
+        <div class="timer" id="timerDisplay">00:00.00</div>
+        <div class="gauge-container"><div id="gaugeBar"></div></div>
+        <div id="gaugeText" class="gauge-text">Charging...</div>
+    </div>
+
+    <div id="overlay">
+        <h1 id="title">Emoji Survival</h1>
+        <div id="lastRecord" style="color: #ffde59; margin-bottom: 10px;"></div>
+        <p>マウスで移動 / [SPACE] でリフレッシュ！</p>
+        <button onclick="startGame()">Start Game</button>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+<script>
+  
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const timerDisplay = document.getElementById('timerDisplay');
+    const gaugeBar = document.getElementById('gaugeBar');
+    const gaugeText = document.getElementById('gaugeText');
+    const overlay = document.getElementById('overlay');
+    const lastRecord = document.getElementById('lastRecord');
+
+    canvas.width = 800;
+    canvas.height = 600;
+
+    let startTime, elapsedTime, gameActive = false;
+    let player = { x: 400, y: 300, emoji: '😊' };
+    let enemies = [];
+    const negativeWords = ['不安', '怒り', '残業', '孤独', '偏見', 'ストレス', '失言', '批判', '納期', '炎上'];
+    
+    // 必殺技関連
+    let lastSkillUsedTime = 0;
+    const SKILL_COOLDOWN = 15000; // 7秒
+    let skillReady = false;
+
+    window.addEventListener('mousemove', (e) => {
+        if (!gameActive) return;
+        const rect = canvas.getBoundingClientRect();
+        player.x = e.clientX - rect.left;
+        player.y = e.clientY - rect.top;
+    });
+
+    // スペースキーで必殺技発動
+    window.addEventListener('keydown', (e) => {
+        if (e.code === 'Space' && skillReady && gameActive) {
+            useSkill();
+        }
+    });
+
+    function useSkill() {
+        skillReady = false;
+        lastSkillUsedTime = Date.now();
+        enemies = []; // 敵を全消去
+        
+        // 発動エフェクト（画面を一瞬白く）
+        ctx.fillStyle = "white";
+        ctx.fillRect(0,0,canvas.width, canvas.height);
+        
+        gaugeText.innerText = "Charging...";
+        gaugeText.className = "gauge-text";
+    }
+
+    function formatTime(ms) {
+        const m = Math.floor(ms / 60000);
+        const s = Math.floor((ms % 60000) / 1000);
+        const msPart = Math.floor((ms % 1000) / 10);
+        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}.${msPart.toString().padStart(2, '0')}`;
+    }
+
+    function startGame() {
+        startTime = Date.now();
+        lastSkillUsedTime = startTime;
+        elapsedTime = 0;
+        enemies = [];
+        gameActive = true;
+        overlay.style.display = 'none';
+        spawnEnemy();
+        animate();
+    }
+
+    function spawnEnemy() {
+        if (!gameActive) return;
+        const side = Math.floor(Math.random() * 4);
+        let x, y;
+        if (side === 0) { x = Math.random() * canvas.width; y = -50; }
+        else if (side === 1) { x = canvas.width + 50; y = Math.random() * canvas.height; }
+        else if (side === 2) { x = Math.random() * canvas.width; y = canvas.height + 50; }
+        else { x = -50; y = Math.random() * canvas.height; }
+
+        const word = negativeWords[Math.floor(Math.random() * negativeWords.length)];
+        const enemy = { x, y, text: word, baseSpeed: 1.8 + (elapsedTime / 10000), angle: Math.atan2(player.y - y, player.x - x), spawnTime: Date.now() };
+
+        if (word === 'ストレス') {
+            enemy.angle = Math.random() * Math.PI * 2;
+            enemy.baseSpeed *= 1.4;
+        }
+        if (word === '納期') { enemy.baseSpeed = 0.4; }
+
+        enemies.push(enemy);
+        setTimeout(spawnEnemy, Math.max(150, 1000 - (elapsedTime / 50)));
+    }
+
+    function animate() {
+        if (!gameActive) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        elapsedTime = Date.now() - startTime;
+        timerDisplay.innerText = formatTime(elapsedTime);
+
+        // ゲージの更新
+        const skillProgress = Math.min(100, ((Date.now() - lastSkillUsedTime) / SKILL_COOLDOWN) * 100);
+        gaugeBar.style.width = skillProgress + "%";
+        if (skillProgress >= 100 && !skillReady) {
+            skillReady = true;
+            gaugeText.innerText = "READY [SPACE]";
+            gaugeText.className = "gauge-text ready";
+        }
+
+        ctx.font = '35px serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(player.emoji, player.x, player.y);
+
+        enemies.forEach((enemy, index) => {
+            let speed = enemy.baseSpeed;
+            if (enemy.text === 'ストレス') {
+                enemy.x += Math.cos(enemy.angle) * speed;
+                enemy.y += Math.sin(enemy.angle) * speed;
+                if (enemy.x < -50) enemy.x = canvas.width + 50; if (enemy.x > canvas.width + 50) enemy.x = -50;
+                if (enemy.y < -50) enemy.y = canvas.height + 50; if (enemy.y > canvas.height + 50) enemy.y = -50;
+            } else {
+                if (enemy.text === '納期') speed += ((Date.now() - enemy.spawnTime) / 1000) * 0.6;
+                const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
+                enemy.x += Math.cos(angle) * speed;
+                enemy.y += Math.sin(angle) * speed;
+            }
+
+            ctx.font = 'bold 18px sans-serif';
+            ctx.fillStyle = enemy.text === '納期' ? '#ff007b' : (enemy.text === 'ストレス' ? '#a020f0' : '#ff4d4d');
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = ctx.fillStyle;
+            ctx.fillText(enemy.text, enemy.x, enemy.y);
+            ctx.shadowBlur = 0;
+
+            if (Math.hypot(player.x - enemy.x, player.y - enemy.y) < 28) gameOver();
+        });
+
+        requestAnimationFrame(animate);
+    }
+
+    function gameOver() {
+        gameActive = false;
+        overlay.style.display = 'flex';
+        lastRecord.innerText = `生存時間: ${formatTime(elapsedTime)}`;
+    }
+</script>
+</body>
+</html>
